@@ -39,12 +39,12 @@ CBigNum bnProofOfStakeLimit(~uint256(0) >> 20);
 CBigNum bnProofOfWorkLimitTestNet(~uint256(0) >> 16);
 CBigNum bnProofOfWorkFirstBlock(~uint256(0) >> 30);
 
-unsigned int nTargetSpacing = 1 * 60; // 60 seconds
+unsigned int nTargetSpacing = 5 * 60; // 5 minutes block spacing
 unsigned int nRetarget = 10;
-unsigned int nStakeMinAge = 60 * 60; // 60 minute
-unsigned int nStakeMaxAge = -1;           //unlimited
+unsigned int nStakeMinAge = 60 * 60 * 24 * 0.5; // 12 hours
+unsigned int nStakeMaxAge = 60 * 60 * 24 * 9;           // 7 days     
 unsigned int nModifierInterval = 10 * 60; // time to elapse before new modifier is computed
-static const int64_t nTargetTimespan_legacy = nTargetSpacing * nRetarget; // every 50 blocks
+static const int64_t nTargetTimespan_legacy = 5 * 15 * 60; 
 static const int64_t nInterval = nTargetTimespan_legacy / nTargetSpacing;
 int nCoinbaseMaturity = 110;
 CBlockIndex* pindexGenesisBlock = NULL;
@@ -968,26 +968,11 @@ uint256 WantedByOrphan(const CBlock* pblockOrphan)
 int64_t GetProofOfWorkReward(int64_t nFees)
 {
     int64_t nSubsidy = 1 * COIN;
-	if(pindexBest->nHeight < 1)
+	if(pindexBest->nHeight == 1)
     {
-		nSubsidy = 5000 * COIN;
+		return 11200000 * COIN;
     }
-	else if(pindexBest->nHeight < 500)
-    {
-		nSubsidy = 5000 * COIN;
-    }
-	else if(pindexBest->nHeight < 2000)
-    {
-		nSubsidy = 2500 * COIN;
-    }
-	else if(pindexBest->nHeight < 5000)
-    {
-		nSubsidy = 1250 * COIN;
-    }
-	else if(pindexBest->nHeight < 10000)
-    {
-		nSubsidy = 750 * COIN;
-    }
+	
     if (fDebug && GetBoolArg("-printcreation"))
         printf("GetProofOfWorkReward() : create=%s nSubsidy=%"PRId64"\n", FormatMoney(nSubsidy).c_str(), nSubsidy);
 
@@ -1002,7 +987,9 @@ int64_t GetProofOfStakeReward(int64_t nCoinAge, int64_t nFees)
     nRewardCoinYear = MAX_MINT_PROOF_OF_STAKE;
 
     int64_t nSubsidy = nCoinAge * nRewardCoinYear / 365 / COIN;
-
+	// 0% after 28m total coins
+	if (nMoneySupply > 16000000 * COIN)
+		nSubsidy = 0;
 
     if (fDebug && GetBoolArg("-printcreation"))
         printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRId64"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
@@ -1655,7 +1642,7 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
         if (!vtx[1].GetCoinAge(txdb, nCoinAge))
             return error("ConnectBlock() : %s unable to get coin age for coinstake", vtx[1].GetHash().ToString().substr(0,10).c_str());
 
-        int64_t nCalculatedStakeReward = GetProofOfStakeReward(nCoinAge, nFees);
+        int64_t nCalculatedStakeReward = GetProofOfStakeReward(nCoinAge, nFees, pindex->pprev->nMoneySupply);
 
         if (nStakeReward > nCalculatedStakeReward)
             return DoS(100, error("ConnectBlock() : coinstake pays too much(actual=%"PRId64" vs calculated=%"PRId64")", nStakeReward, nCalculatedStakeReward));
@@ -2565,7 +2552,7 @@ bool LoadBlockIndex(bool fAllowNew)
 
         const char* pszTimestamp = "http://www.nytimes.com/2014/11/09/travel/seeing-the-whole-of-antigua.html";
         CTransaction txNew;
-        txNew.nTime = 1415486373;
+        txNew.nTime = 1504921590;
         txNew.vin.resize(1);
         txNew.vout.resize(1);
         txNew.vin[0].scriptSig = CScript() << 0 << CBigNum(42) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
@@ -2575,9 +2562,9 @@ bool LoadBlockIndex(bool fAllowNew)
         block.hashPrevBlock = 0;
         block.hashMerkleRoot = block.BuildMerkleTree();
         block.nVersion = 1;
-        block.nTime    = 1415486373;
+        block.nTime    = 1504921590;
         block.nBits    = bnProofOfWorkLimit.GetCompact();
-        block.nNonce   = 5541609;
+        block.nNonce   = 0;
 		if(fTestNet)
         {
             block.nNonce   = 0;
